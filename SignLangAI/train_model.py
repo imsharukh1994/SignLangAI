@@ -1,36 +1,35 @@
 import os
-import numpy as np
-import cv2
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.callbacks import ModelCheckpoint
 
-# Set dataset path
-data_path = 'data/'
+# Paths
+train_dir = 'data/train'
+img_size = 64
+batch_size = 64
+epochs = 10
 
-# Image parameters
-img_size = 64  # Resize all images to 64x64 pixels
+# Image data generator with rescaling and validation split
+datagen = ImageDataGenerator(rescale=1./255, validation_split=0.2)
 
-# Prepare the image data generator for augmenting images
-train_datagen = ImageDataGenerator(rescale=1.0/255.0, validation_split=0.2)
-
-train_generator = train_datagen.flow_from_directory(
-    data_path,
+train_generator = datagen.flow_from_directory(
+    train_dir,
     target_size=(img_size, img_size),
-    batch_size=32,
+    batch_size=batch_size,
     class_mode='categorical',
     subset='training'
 )
 
-validation_generator = train_datagen.flow_from_directory(
-    data_path,
+val_generator = datagen.flow_from_directory(
+    train_dir,
     target_size=(img_size, img_size),
-    batch_size=32,
+    batch_size=batch_size,
     class_mode='categorical',
     subset='validation'
 )
 
-# Build the CNN model
+# Model architecture
 model = Sequential([
     Conv2D(32, (3, 3), activation='relu', input_shape=(img_size, img_size, 3)),
     MaxPooling2D(2, 2),
@@ -38,14 +37,14 @@ model = Sequential([
     MaxPooling2D(2, 2),
     Flatten(),
     Dense(128, activation='relu'),
-    Dense(len(train_generator.class_indices), activation='softmax')
+    Dense(29, activation='softmax')  # 29 classes in the dataset (A-Z, nothing, space, delete)
 ])
 
-# Compile the model
+# Compile model
 model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
-# Train the model
-model.fit(train_generator, epochs=10, validation_data=validation_generator)
+# Save best model
+checkpoint = ModelCheckpoint('model/ASL_model.h5', save_best_only=True)
 
-# Save the model
-model.save('model/ASL_model.h5')
+# Train the model
+model.fit(train_generator, epochs=epochs, validation_data=val_generator, callbacks=[checkpoint])
